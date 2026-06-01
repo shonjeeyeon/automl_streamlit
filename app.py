@@ -1,13 +1,14 @@
 """
 AutoML Insight Studio
-A human-centered Streamlit AutoML app for tabular classification.
+A human-centered Streamlit AutoML app for CSV dataset classification.
 
 How to run:
 1. Save this file as app.py
 2. Install dependencies:
    pip install streamlit pandas numpy scikit-learn matplotlib seaborn
 3. Run:
-   streamlit run app.py
+   1) streamlit run app.py, OR
+   2) visit: https://automlapp-mqysgjr8wnc6cvk35tuyww.streamlit.app/
 """
 
 # Import Libraries
@@ -30,7 +31,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 
 
-# Page setup
+# Page setup: Will use wide to display the tables
 st.set_page_config(
     page_title="AutoML Insight Studio",
     layout="wide"
@@ -87,7 +88,7 @@ st.markdown(
 # Helper functions
 
 def make_sample_dataset():
-    """Create a small sample classification dataset for users without a CSV file."""
+    """Create a small sample probability based classification dataset. That will help users without a CSV file understand how to run the app."""
     rng = np.random.default_rng(42)
     n = 250
     age = rng.integers(18, 70, n)
@@ -113,7 +114,7 @@ def make_sample_dataset():
 
 
 def get_problem_warning(target_series):
-    """Return a user-friendly warning if the target column is not ideal."""
+    """Return a user-friendly warning if the target column is not ideal: Too few or too many classes"""
     unique_count = target_series.nunique(dropna=True)
 
     if unique_count < 2:
@@ -131,6 +132,7 @@ def build_preprocessor(X):
     numeric_features = X.select_dtypes(include=["int64", "float64", "int32", "float32"]).columns.tolist()
     categorical_features = X.select_dtypes(exclude=["int64", "float64", "int32", "float32"]).columns.tolist()
 
+   # Pipelines for impute, scaling, and encoding
     numeric_transformer = Pipeline(steps=[
         ("imputer", SimpleImputer(strategy="median")),
         ("scaler", StandardScaler())
@@ -155,6 +157,7 @@ def train_models(X_train, X_test, y_train, y_test):
     """Train three models and return results."""
     preprocessor, numeric_features, categorical_features = build_preprocessor(X_train)
 
+   # Will use Logreg, RF, and NN (MLPClassifier)
     models = {
         "Logistic Regression": LogisticRegression(max_iter=1000),
         "Random Forest": RandomForestClassifier(n_estimators=150, random_state=42),
@@ -227,6 +230,7 @@ def plot_confusion_matrix(cm, labels, title):
 
 
 def explain_accuracy(score):
+   """Explain what the score means"""
     if score >= 0.90:
         return "Excellent performance. The model is making very accurate predictions on the test data."
     if score >= 0.80:
@@ -238,7 +242,6 @@ def explain_accuracy(score):
 
 
 # App header
-
 st.markdown('<p class="main-title">AutoML Insight Studio</p>', unsafe_allow_html=True)
 st.markdown(
     '<p class="subtitle">Upload a CSV dataset, choose a target column, and compare three machine learning models automatically.</p>',
@@ -249,10 +252,11 @@ st.markdown(
 # Sidebar guidance
 with st.sidebar:
     st.header("How to Use This App")
-    st.write("1. Upload a CSV file or use the sample dataset.")
-    st.write("2. Preview the data and select a target column.")
-    st.write("3. Run the models with one click.")
-    st.write("4. Review accuracy, charts, and recommendations.")
+    st.write("Step 1. Upload a CSV file or use the sample dataset.")
+    st.write("Step 2. Preview the data.")
+    st.write("Step 3. Select a target column.")   
+    st.write("Step 4. Run the models with one click.")
+    st.write("Step 5. Review accuracy, charts, and recommendations.")
 
     st.divider()
     st.subheader("Human-Centered Design")
@@ -428,9 +432,9 @@ report_df = pd.DataFrame(report).transpose()
 st.dataframe(report_df, use_container_width=True)
 
 
-# -----------------------------
+
 # Human-centered explanation
-# -----------------------------
+
 st.header("What These Results Mean")
 st.write(
     "Accuracy shows the percentage of test examples the model predicted correctly. "
