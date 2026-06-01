@@ -84,8 +84,9 @@ st.markdown(
 )
 
 
-
+# ==================
 # Helper functions
+# ==================
 
 def make_sample_dataset():
     """Create a small sample probability based classification dataset. That will help users without a CSV file understand how to run the app."""
@@ -240,6 +241,9 @@ def explain_accuracy(score):
     return "Low performance. The dataset may need cleaning, better features, or a different modeling approach."
 
 
+# ==================
+# Visualization
+# ==================
 
 # App header
 st.markdown('<p class="main-title">AutoML Insight Studio</p>', unsafe_allow_html=True)
@@ -249,7 +253,7 @@ st.markdown(
 )
 
 
-# Sidebar guidance
+# Sidebar guidance: display steps to take
 with st.sidebar:
     st.header("How to Use This App")
     st.write("Step 1. Upload a CSV file or use the sample dataset.")
@@ -269,12 +273,16 @@ st.write("Use a CSV file with rows as observations and columns as features. One 
 
 col_upload, col_sample = st.columns([2, 1])
 
+# Form for drag and drop CSV upload
 with col_upload:
     uploaded_file = st.file_uploader("Drag and drop your CSV file here", type=["csv"])
 
+# Choose to use sample dataset
 with col_sample:
     use_sample = st.button("Use Sample Dataset")
 
+# Success message if CSV is valid; error message for invalid files
+# Success message if sample CSV is made successfully
 if uploaded_file is not None:
     try:
         df = pd.read_csv(uploaded_file)
@@ -295,14 +303,17 @@ else:
 
 st.header("Step 2: Understand Your Data")
 
+# Show shape of the dataset and number of NAs
 summary_col1, summary_col2, summary_col3 = st.columns(3)
 summary_col1.metric("Rows", df.shape[0])
 summary_col2.metric("Columns", df.shape[1])
 summary_col3.metric("Missing Values", int(df.isna().sum().sum()))
 
+# Preview of the dataset (expanded)
 with st.expander("Preview dataset", expanded=True):
     st.dataframe(df.head(20), use_container_width=True)
 
+# Column summary of the dataset (expander, not expanded)
 with st.expander("Column summary"):
     summary = pd.DataFrame({
         "Column": df.columns,
@@ -317,15 +328,20 @@ with st.expander("Column summary"):
 # Step 3: Select target
 
 st.header("Step 3: Choose What You Want to Predict")
+
+# Explain how to select the target column
 st.write("Select the target column. For this version, the target should be a classification label such as Yes/No, Purchased/Not Purchased, or Category A/B/C.")
 
+# Use dropdown to select
 target_column = st.selectbox("Target column", df.columns)
 
+# Warning if the target has too many or too few classes
 target_warning = get_problem_warning(df[target_column])
 if target_warning:
     st.error(target_warning)
     st.stop()
 
+# Separate the target variable
 X = df.drop(columns=[target_column])
 y = df[target_column]
 
@@ -334,10 +350,12 @@ valid_target_rows = y.notna()
 X = X.loc[valid_target_rows]
 y = y.loc[valid_target_rows]
 
+# Label encoding for classes
 label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y.astype(str))
 class_labels = label_encoder.classes_
 
+# Print success message and detected classes
 st.success(f"Target selected: {target_column}")
 st.write(f"Detected classes: {', '.join(class_labels.astype(str))}")
 
@@ -347,19 +365,23 @@ st.write(f"Detected classes: {', '.join(class_labels.astype(str))}")
 
 st.header("Step 4: Run the AutoML Models")
 
+# Explanation of the step and models to be used
 st.write("The app will automatically preprocess the data and run three models:")
 st.write("✓ Logistic Regression")
 st.write("✓ Random Forest")
 st.write("✓ Neural Network")
 
+# Slider for setting the test set percentage
 test_size = st.slider("Test data percentage", min_value=10, max_value=40, value=20, step=5)
 
+# Button for running the model
 run_models = st.button("Run Models")
 
 if not run_models:
     st.info("Click “Run Models” when you are ready.")
     st.stop()
 
+# Run training/test split, using the test_size input from the slider
 try:
     stratify_value = y_encoded if len(np.unique(y_encoded)) > 1 else None
     X_train, X_test, y_train, y_test = train_test_split(
@@ -369,6 +391,8 @@ try:
         random_state=42,
         stratify=stratify_value
     )
+
+# Try again without stratification when stratification cannot be done
 except ValueError:
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -377,8 +401,11 @@ except ValueError:
         random_state=42
     )
 
+# Run the functions to run the models
 try:
     results, trained_pipelines, numeric_features, categorical_features = train_models(X_train, X_test, y_train, y_test)
+   
+# Error message to explain potential reasons when the model could not run
 except Exception as error:
     st.error("The models could not run successfully. Try checking for unusual columns, too little data, or an unsuitable target column.")
     st.exception(error)
@@ -390,36 +417,45 @@ except Exception as error:
 
 st.header("Step 5: Results Dashboard")
 
+# View the result of each model
 results_df = pd.DataFrame([
     {"Model": item["Model"], "Accuracy": item["Accuracy"]}
     for item in results
 ]).sort_values(by="Accuracy", ascending=False)
 
+# Find the best model
 best_model_name = results_df.iloc[0]["Model"]
 best_accuracy = results_df.iloc[0]["Accuracy"]
 best_predictions = next(item["Predictions"] for item in results if item["Model"] == best_model_name)
 
+# Display the recommendation
 st.markdown(
     f'<div class="success-box"><strong>Recommended Model:</strong> {best_model_name} with {best_accuracy:.2%} accuracy.<br>{explain_accuracy(best_accuracy)}</div>',
     unsafe_allow_html=True
 )
 
+# Display the best model, accuracy, and number of test set rows
 metric_col1, metric_col2, metric_col3 = st.columns(3)
 metric_col1.metric("Best Model", best_model_name)
 metric_col2.metric("Best Accuracy", f"{best_accuracy:.2%}")
 metric_col3.metric("Test Rows", len(y_test))
 
+# Compare the models
 st.subheader("Model Comparison")
 st.dataframe(
     results_df.assign(Accuracy=results_df["Accuracy"].map(lambda value: f"{value:.2%}")),
     use_container_width=True
 )
+
+# Bar plot to compare performances
 plot_accuracy(results_df)
 
+# Build a confusion matrix
 st.subheader("Confusion Matrix for Recommended Model")
 cm = confusion_matrix(y_test, best_predictions)
 plot_confusion_matrix(cm, class_labels, f"Confusion Matrix: {best_model_name}")
 
+# Classification report of each model in a tabluar form
 st.subheader("Detailed Classification Report")
 report = classification_report(
     y_test,
@@ -433,7 +469,7 @@ st.dataframe(report_df, use_container_width=True)
 
 
 
-# Human-centered explanation
+# Human-centered explanation of what the results mean and how the dataset was processed
 
 st.header("What These Results Mean")
 st.write(
